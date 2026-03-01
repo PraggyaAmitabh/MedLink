@@ -33,6 +33,7 @@ const AmbulancePage = () => {
   const [tracking, setTracking] = useState(false);
   const [ambulanceInfo, setAmbulanceInfo] = useState(null);
   const [showCall, setShowCall] = useState(false);
+  const [ambulanceId, setAmbulanceId] = useState(null);
   const [callStatus, setCallStatus] = useState('Connecting...');
   const [form, setForm] = useState({
     patientName: '',
@@ -90,6 +91,21 @@ const AmbulancePage = () => {
     return () => peer.destroy();
   }, []);
 
+  useEffect(() => {
+  if (!ambulanceId || !position) return;
+
+  const interval = setInterval(async () => {
+    const { error } = await supabase
+      .from('ambulances')
+      .update({ lat: position[0], lng: position[1] })
+      .eq('id', ambulanceId);
+
+    if (error) console.error('Error updating location:', error);
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [ambulanceId, position]);
+
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const handleVitalsChange = (e) => setVitals({ ...vitals, [e.target.name]: e.target.value });
 
@@ -99,7 +115,6 @@ const handleDispatch = async () => {
     return;
   }
 
-  // Save to Supabase ambulances table
   const { data, error } = await supabase
     .from('ambulances')
     .insert([{
@@ -108,7 +123,8 @@ const handleDispatch = async () => {
       status: 'dispatched',
       lat: position[0],
       lng: position[1],
-    }]);
+    }])
+    .select(); // this returns the inserted row including its id
 
   if (error) {
     console.error('Error saving ambulance:', error);
@@ -116,6 +132,7 @@ const handleDispatch = async () => {
     return;
   }
 
+  setAmbulanceId(data[0].id); // save the id for later updates
   setAmbulanceInfo(form);
   setTracking(true);
 };
