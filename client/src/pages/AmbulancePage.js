@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import Peer from 'peerjs';
+import { supabase } from '../supabaseClient';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -92,24 +93,58 @@ const AmbulancePage = () => {
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const handleVitalsChange = (e) => setVitals({ ...vitals, [e.target.name]: e.target.value });
 
-  const handleDispatch = () => {
-    if (!form.patientName || !form.destination || !form.driver || !form.paramedic) {
-      alert('Please fill in all fields!');
-      return;
-    }
-    setAmbulanceInfo(form);
-    setTracking(true);
-  };
+const handleDispatch = async () => {
+  if (!form.patientName || !form.destination || !form.driver || !form.paramedic) {
+    alert('Please fill in all fields!');
+    return;
+  }
 
-  const handleSaveVitals = () => {
-    if (!vitals.bp || !vitals.hr || !vitals.oxygen || !vitals.temp) {
-      alert('Please fill in all vitals!');
-      return;
-    }
-    // Week 2 — will send to Supabase via P1's API
-    setVitalsSaved(true);
-    setTimeout(() => setVitalsSaved(false), 3000);
-  };
+  // Save to Supabase ambulances table
+  const { data, error } = await supabase
+    .from('ambulances')
+    .insert([{
+      patient_name: form.patientName,
+      destination: form.destination,
+      status: 'dispatched',
+      lat: position[0],
+      lng: position[1],
+    }]);
+
+  if (error) {
+    console.error('Error saving ambulance:', error);
+    alert('Failed to save to database!');
+    return;
+  }
+
+  setAmbulanceInfo(form);
+  setTracking(true);
+};
+
+ const handleSaveVitals = async () => {
+  if (!vitals.bp || !vitals.hr || !vitals.oxygen || !vitals.temp) {
+    alert('Please fill in all vitals!');
+    return;
+  }
+
+  const { error } = await supabase
+    .from('vitals')
+    .insert([{
+      patient_name: ambulanceInfo.patientName,
+      blood_pressure: vitals.bp,
+      heart_rate: vitals.hr,
+      oxygen_level: vitals.oxygen,
+      notes: vitals.notes,
+    }]);
+
+  if (error) {
+    console.error('Error saving vitals:', error);
+    alert('Failed to save vitals!');
+    return;
+  }
+
+  setVitalsSaved(true);
+  setTimeout(() => setVitalsSaved(false), 3000);
+};
 
   const closeCall = () => {
     setShowCall(false);
@@ -242,7 +277,7 @@ const AmbulancePage = () => {
 
           {vitalsSaved && (
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm text-center">
-              ✅ Vitals saved! Will sync to doctor in Week 2
+              ✅ Vitals saved to database!
             </div>
           )}
         </div>
