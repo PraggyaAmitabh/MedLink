@@ -42,6 +42,15 @@ const AmbulancePage = () => {
     status: 'En Route',
   });
 
+  const [vitals, setVitals] = useState({
+    bp: '',
+    hr: '',
+    oxygen: '',
+    temp: '',
+    notes: '',
+  });
+  const [vitalsSaved, setVitalsSaved] = useState(false);
+
   const peerRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -60,12 +69,10 @@ const AmbulancePage = () => {
     return () => navigator.geolocation.clearWatch(watcher);
   }, []);
 
-  // PeerJS — only setup, no camera access yet
+  // PeerJS
   useEffect(() => {
     const peer = new Peer();
     peerRef.current = peer;
-
-    // When doctor calls the paramedic
     peer.on('call', (call) => {
       setShowCall(true);
       setCallStatus('Incoming call from doctor...');
@@ -79,11 +86,11 @@ const AmbulancePage = () => {
           });
         });
     });
-
     return () => peer.destroy();
   }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleVitalsChange = (e) => setVitals({ ...vitals, [e.target.name]: e.target.value });
 
   const handleDispatch = () => {
     if (!form.patientName || !form.destination || !form.driver || !form.paramedic) {
@@ -92,6 +99,16 @@ const AmbulancePage = () => {
     }
     setAmbulanceInfo(form);
     setTracking(true);
+  };
+
+  const handleSaveVitals = () => {
+    if (!vitals.bp || !vitals.hr || !vitals.oxygen || !vitals.temp) {
+      alert('Please fill in all vitals!');
+      return;
+    }
+    // Week 2 — will send to Supabase via P1's API
+    setVitalsSaved(true);
+    setTimeout(() => setVitalsSaved(false), 3000);
   };
 
   const closeCall = () => {
@@ -107,7 +124,7 @@ const AmbulancePage = () => {
   return (
     <div className="flex h-screen font-sans relative">
 
-      {/* Left — Form */}
+      {/* Left — Dispatch Form */}
       <div className="w-72 min-w-[288px] bg-gray-50 p-6 flex flex-col gap-4 overflow-y-auto shadow-md">
         <h2 className="text-xl font-bold text-blue-600">🚑 Dispatch Ambulance</h2>
 
@@ -142,7 +159,6 @@ const AmbulancePage = () => {
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm text-center">
               ✅ Ambulance is being tracked!
             </div>
-            {/* Join Call button — only shows after dispatch */}
             <button
               onClick={() => setShowCall(true)}
               className="py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold text-sm transition-colors cursor-pointer"
@@ -153,7 +169,7 @@ const AmbulancePage = () => {
         )}
       </div>
 
-      {/* Right — Info Panel + Map */}
+      {/* Middle — Info Panel + Map */}
       <div className="flex flex-col flex-1">
         {ambulanceInfo && (
           <div className="flex gap-3 p-3 bg-gray-100 flex-wrap shadow-sm">
@@ -181,11 +197,61 @@ const AmbulancePage = () => {
         </MapContainer>
       </div>
 
+      {/* Right — Vitals Panel (only shows after dispatch) */}
+      {tracking && (
+        <div className="w-72 min-w-[288px] bg-gray-50 p-6 flex flex-col gap-4 overflow-y-auto shadow-md border-l border-gray-200">
+          <h2 className="text-xl font-bold text-red-500">🩺 Patient Vitals</h2>
+          <p className="text-xs text-gray-400">Enter vitals in real time as paramedic monitors the patient</p>
+
+          {[
+            { label: 'Blood Pressure (mmHg)', name: 'bp', placeholder: 'e.g. 120/80' },
+            { label: 'Heart Rate (bpm)', name: 'hr', placeholder: 'e.g. 72' },
+            { label: 'Oxygen Level (%)', name: 'oxygen', placeholder: 'e.g. 98' },
+            { label: 'Temperature (°C)', name: 'temp', placeholder: 'e.g. 37.2' },
+          ].map(field => (
+            <div key={field.name}>
+              <label className="text-xs text-gray-500 block mb-1">{field.label}</label>
+              <input
+                name={field.name}
+                value={vitals[field.name]}
+                onChange={handleVitalsChange}
+                placeholder={field.placeholder}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+          ))}
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Notes</label>
+            <textarea
+              name="notes"
+              value={vitals.notes}
+              onChange={handleVitalsChange}
+              placeholder="e.g. Patient is conscious, complaining of chest pain"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+            />
+          </div>
+
+          <button
+            onClick={handleSaveVitals}
+            className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold text-sm transition-colors cursor-pointer"
+          >
+            💾 Save Vitals
+          </button>
+
+          {vitalsSaved && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm text-center">
+              ✅ Vitals saved! Will sync to doctor in Week 2
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Video Call Modal */}
       {showCall && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center" style={{zIndex: 9999}}>
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center" style={{ zIndex: 9999 }}>
           <div className="bg-white rounded-2xl p-6 w-[700px] shadow-2xl">
-
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">📞 Doctor Call</h3>
               <div className={`text-xs font-semibold px-3 py-1 rounded-full ${callStatus === 'Connected' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
@@ -193,7 +259,6 @@ const AmbulancePage = () => {
               </div>
             </div>
 
-            {/* Videos */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-xs text-gray-400 mb-1">Your Camera</p>
