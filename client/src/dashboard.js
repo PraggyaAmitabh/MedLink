@@ -1,17 +1,43 @@
 import { useEffect, useState } from 'react'
 import { getBeds, getStaff, getAmbulances } from './api'
 import { logoutUser } from './auth'
+import { supabase } from './supabaseClient'
 
 function Dashboard() {
   const [beds, setBeds] = useState([])
   const [staff, setStaff] = useState([])
   const [ambulances, setAmbulances] = useState([])
 
-  useEffect(() => {
-    getBeds().then(setBeds).catch(console.error)
-    getStaff().then(setStaff).catch(console.error)
-    getAmbulances().then(setAmbulances).catch(console.error)
-  }, [])
+ useEffect(() => {
+  async function loadData() {
+    const bedsData = await getBeds()
+    const staffData = await getStaff()
+    const ambulanceData = await getAmbulances()
+
+    setBeds(bedsData || [])
+    setStaff(staffData || [])
+    setAmbulances(ambulanceData || [])
+  }
+
+  loadData()
+
+  // REAL-TIME BED UPDATES
+  const channel = supabase
+    .channel('beds-realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'beds' },
+      payload => {
+        console.log('Beds updated:', payload)
+        getBeds().then(setBeds)
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+ }, [])
 
   async function handleLogout() {
     await logoutUser()
@@ -35,8 +61,14 @@ function Dashboard() {
 
       <h2>Ambulances ({ambulances.length})</h2>
       {ambulances.map(a => (
-        <div key={a.id}>Ambulance {a.id} — {a.status}</div>
-      ))}
+     <div key={a.id}>
+      🚑 {a.vehicle_number} — {a.status}  
+     <br/>
+      Patient: {a.patient_name || "None"}  
+      <br/>
+      Destination: {a.destination || "Not assigned"}
+     </div>
+))}
     </div>
   )
 }
