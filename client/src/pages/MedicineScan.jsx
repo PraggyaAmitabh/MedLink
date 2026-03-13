@@ -1,104 +1,119 @@
-/* global cv */
+import React, { useEffect, useRef } from "react";
 
-import React, { useRef, useState } from "react";
-
-function MedicineScan() {
-
+const MedicineScan = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [imageData, setImageData] = useState(null);
+
+  useEffect(() => {
+    startCamera();
+  }, []);
 
   const startCamera = async () => {
+    const video = videoRef.current;
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+      });
 
-      const video = videoRef.current;
-
-      if (video) {
-        video.srcObject = stream;
-        await video.play();
-      }
-
-    } catch (error) {
-      console.error("Camera error:", error);
-      alert("Camera access failed");
+      video.srcObject = stream;
+    } catch (err) {
+      console.error("Camera error:", err);
     }
   };
 
   const captureImage = () => {
-
-    if (typeof cv === "undefined") {
-      alert("OpenCV still loading. Wait a few seconds and try again.");
-      return;
-    }
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
-
-    if (!video || !canvas) return;
 
     const ctx = canvas.getContext("2d");
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0);
 
-    // OpenCV Processing
-    const src = cv.imread(canvas);
-    const gray = new cv.Mat();
-    const edges = new cv.Mat();
+    if (window.cv) {
+      const cv = window.cv;
 
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    cv.Canny(gray, edges, 50, 100);
+      let src = cv.imread(canvas);
+      let gray = new cv.Mat();
+      let edges = new cv.Mat();
 
-    cv.imshow(canvas, edges);
+      // Convert to grayscale
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-    const img = canvas.toDataURL("image/png");
-    setImageData(img);
+      // Edge detection
+      cv.Canny(gray, edges, 50, 100);
 
-    src.delete();
-    gray.delete();
-    edges.delete();
+      // Find contours
+      let contours = new cv.MatVector();
+      let hierarchy = new cv.Mat();
+
+      cv.findContours(
+        edges,
+        contours,
+        hierarchy,
+        cv.RETR_EXTERNAL,
+        cv.CHAIN_APPROX_SIMPLE
+      );
+
+      // Draw rectangle around detected objects
+      for (let i = 0; i < contours.size(); i++) {
+        let cnt = contours.get(i);
+        let rect = cv.boundingRect(cnt);
+
+        cv.rectangle(
+          src,
+          new cv.Point(rect.x, rect.y),
+          new cv.Point(rect.x + rect.width, rect.y + rect.height),
+          [0, 255, 0, 255],
+          2
+        );
+      }
+
+      cv.imshow(canvas, src);
+
+      // Clean memory
+      src.delete();
+      gray.delete();
+      edges.delete();
+      contours.delete();
+      hierarchy.delete();
+    }
   };
 
   return (
-    <div style={{ textAlign: "center", marginTop: "40px" }}>
-
+    <div style={{ textAlign: "center" }}>
       <h2>Medicine Scanner</h2>
 
-      <video
-        ref={videoRef}
-        width="400"
-        autoPlay
-        playsInline
-        muted
-        style={{ border: "2px solid black" }}
-      />
+<video
+  ref={videoRef}
+  autoPlay
+  playsInline
+  width="400"
+  height="300"
+  style={{ border: "2px solid black" }}
+/>
 
-      <br /><br />
+      <br />
+      <br />
 
-      <button onClick={startCamera}>
-        Start Camera
-      </button>
-
-      <button onClick={captureImage} style={{ marginLeft: "10px" }}>
+      <button onClick={captureImage}>
         Capture Medicine
       </button>
 
-      <br /><br />
+      <br />
+      <br />
 
-      <canvas ref={canvasRef} width="400"></canvas>
-
-      {imageData && (
-        <div>
-          <h3>Processed Image</h3>
-          <img src={imageData} alt="processed" width="400"/>
-        </div>
-      )}
-
+      <canvas
+        ref={canvasRef}
+        width="400"
+        height="300"
+        style={{ border: "2px solid green" }}
+      />
     </div>
   );
-}
+};
 
 export default MedicineScan;
