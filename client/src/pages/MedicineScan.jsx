@@ -1,23 +1,21 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 
 function MedicineScan() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [imageData, setImageData] = useState(null);
 
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-
       const video = videoRef.current;
 
       if (video) {
         video.srcObject = stream;
-        await video.play();   // important fix
+        await video.play();
       }
-
     } catch (error) {
       console.error("Camera error:", error);
-      alert("Camera access failed. Please allow permission.");
     }
   };
 
@@ -25,14 +23,15 @@ function MedicineScan() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    if (!video || !canvas) return;
-
     const ctx = canvas.getContext("2d");
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0);
+
+    const img = canvas.toDataURL("image/png");
+    setImageData(img);
   };
 
   return (
@@ -50,9 +49,7 @@ function MedicineScan() {
 
       <br /><br />
 
-      <button onClick={startCamera}>
-        Start Camera
-      </button>
+      <button onClick={startCamera}>Start Camera</button>
 
       <button onClick={captureImage} style={{ marginLeft: "10px" }}>
         Capture Medicine
@@ -60,7 +57,14 @@ function MedicineScan() {
 
       <br /><br />
 
-      <canvas ref={canvasRef} width="400" />
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+
+      {imageData && (
+        <div>
+          <h3>Captured Image</h3>
+          <img src={imageData} alt="captured" width="400" />
+        </div>
+      )}
     </div>
   );
 }
