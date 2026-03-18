@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Login from './login'
 import Register from './register'
 import Dashboard from './dashboard'
+import MedicineScan from "./pages/MedicineScan";
 
 function App() {
   return (
@@ -12,8 +13,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/scan" element={<MedicineScan />} />
       </Routes>
     </Router>
+  
   )
 }
 
