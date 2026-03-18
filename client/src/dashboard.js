@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import { getBeds, getStaff, getAmbulances } from './api'
 import { logoutUser } from './auth'
@@ -8,36 +9,49 @@ function Dashboard() {
   const [staff, setStaff] = useState([])
   const [ambulances, setAmbulances] = useState([])
 
- useEffect(() => {
-  async function loadData() {
-    const bedsData = await getBeds()
-    const staffData = await getStaff()
-    const ambulanceData = await getAmbulances()
+  useEffect(() => {
+    async function loadData() {
+      const bedsData = await getBeds()
+      const staffData = await getStaff()
+      const ambulanceData = await getAmbulances()
+      setBeds(bedsData || [])
+      setStaff(staffData || [])
+      setAmbulances(ambulanceData || [])
+    }
 
-    setBeds(bedsData || [])
-    setStaff(staffData || [])
-    setAmbulances(ambulanceData || [])
-  }
+    loadData()
 
-  loadData()
+    // REAL-TIME BED UPDATES
+    const bedChannel = supabase
+      .channel('beds-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'beds' },
+        payload => {
+          console.log('Beds updated:', payload)
+          getBeds().then(setBeds)
+        }
+      )
+      .subscribe()
 
-  // REAL-TIME BED UPDATES
-  const channel = supabase
-    .channel('beds-realtime')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'beds' },
-      payload => {
-        console.log('Beds updated:', payload)
-        getBeds().then(setBeds)
-      }
-    )
-    .subscribe()
+    // REAL-TIME AMBULANCE UPDATES
+    const ambulanceChannel = supabase
+      .channel('ambulances-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ambulances' },
+        payload => {
+          console.log('Ambulance updated:', payload)
+          getAmbulances().then(setAmbulances)
+        }
+      )
+      .subscribe()
 
-  return () => {
-    supabase.removeChannel(channel)
-  }
- }, [])
+    return () => {
+      supabase.removeChannel(bedChannel)
+      supabase.removeChannel(ambulanceChannel)
+    }
+  }, [])
 
   async function handleLogout() {
     await logoutUser()
@@ -61,14 +75,14 @@ function Dashboard() {
 
       <h2>Ambulances ({ambulances.length})</h2>
       {ambulances.map(a => (
-     <div key={a.id}>
-      🚑 {a.vehicle_number} — {a.status}  
-     <br/>
-      Patient: {a.patient_name || "None"}  
-      <br/>
-      Destination: {a.destination || "Not assigned"}
-     </div>
-))}
+        <div key={a.id}>
+          🚑 {a.vehicle_number} — {a.status}
+          <br />
+          Patient: {a.patient_name || 'None'}
+          <br />
+          Destination: {a.destination || 'Not assigned'}
+        </div>
+      ))}
     </div>
   )
 }
