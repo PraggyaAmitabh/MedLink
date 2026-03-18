@@ -81,3 +81,29 @@ export async function getStaff() {
   if (error) console.error(error);
   return data;
 }
+/* ---------------- NOTIFICATIONS ---------------- */
+export async function createNotification(message, type = 'ambulance_dispatch') {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert([{ message, type }])
+  if (error) throw error
+  return data
+}
+
+export async function getNotifications() {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function markNotificationRead(id) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', id)
+  if (error) throw error
+  return data
+}
